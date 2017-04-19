@@ -14,10 +14,11 @@ public class AppConstant {
     /* Support to load Bitmap from Dish cache or Server.*/
     static final int Request_getGalleryInfo = 1000;
     static final int Response_getGalleryInfo = 1001;
-    static final int Request_loadImage = 1002;
-    static final int Response_loadImage = 1003;
-    static final int Request_loadSpecificedBitmap=1004;
-    static final int Response_loadSpecificedBitmap = 1005;
+    static final int Request_checkWholeList_bitmapExisted = 1002;
+    static final int Request_loadImage_forManAct = 1003;
+    static final int Response_loadImage_forManAct = 1004;
+    static final int Request_loadImage_forDetAct=1005;
+    static final int Response_loadImage_forDetAct = 1006;
     static final int Request_InitDiskCacheDir = 2000;
     static final int Request_cleanCache = 2001;
     static final String Intent_action_displayDetail = "intent.action.showDetail";

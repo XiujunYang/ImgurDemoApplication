@@ -53,13 +53,14 @@ import static com.example.mobilabassignment.AppConstant.JSON_key_title;
 import static com.example.mobilabassignment.AppConstant.JSON_key_type;
 import static com.example.mobilabassignment.AppConstant.JSON_key_ups;
 import static com.example.mobilabassignment.AppConstant.Request_InitDiskCacheDir;
+import static com.example.mobilabassignment.AppConstant.Request_checkWholeList_bitmapExisted;
 import static com.example.mobilabassignment.AppConstant.Request_cleanCache;
 import static com.example.mobilabassignment.AppConstant.Request_getGalleryInfo;
-import static com.example.mobilabassignment.AppConstant.Request_loadImage;
-import static com.example.mobilabassignment.AppConstant.Request_loadSpecificedBitmap;
+import static com.example.mobilabassignment.AppConstant.Request_loadImage_forDetAct;
+import static com.example.mobilabassignment.AppConstant.Request_loadImage_forManAct;
 import static com.example.mobilabassignment.AppConstant.Response_getGalleryInfo;
-import static com.example.mobilabassignment.AppConstant.Response_loadImage;
-import static com.example.mobilabassignment.AppConstant.Response_loadSpecificedBitmap;
+import static com.example.mobilabassignment.AppConstant.Response_loadImage_forDetAct;
+import static com.example.mobilabassignment.AppConstant.Response_loadImage_forManAct;
 import static com.example.mobilabassignment.AppConstant.base_url;
 import static com.example.mobilabassignment.AppConstant.cache_fileName;
 import static com.example.mobilabassignment.AppConstant.imgur_app_auth_flag;
@@ -146,20 +147,26 @@ public class ImageLoaderHandler {
                         if(getGallyInfo(filter_section,filter_window,filter_sort,page)) {
                             if(image_list.size()<=0) break;
                             uiHandlers.get(0).obtainMessage(Response_getGalleryInfo, image_list).sendToTarget();
-                            for(Iterator it = image_list.iterator();it.hasNext();)
-                                obtainMessage(Request_loadImage,it.next()).sendToTarget();
+                            obtainMessage(Request_checkWholeList_bitmapExisted).sendToTarget();
                         } else uiHandlers.get(0).obtainMessage(Response_getGalleryInfo).sendToTarget();
                         break;
-                    case Request_loadImage:
+                    case Request_checkWholeList_bitmapExisted:
+                        for(Iterator it = image_list.iterator();it.hasNext();){
+                            GalleryImage item = (GalleryImage) it.next();
+                            if(item.getImgBitmap()==null)
+                                obtainMessage(Request_loadImage_forManAct,item).sendToTarget();
+                        }
+                        break;
+                    case Request_loadImage_forManAct:
                         if(msg.obj==null||uiHandlers.get(0)==null) break;
                         if(loadImgBitmap((GalleryImage) msg.obj))
-                            uiHandlers.get(0).obtainMessage(Response_loadImage, image_list).sendToTarget();
+                            uiHandlers.get(0).obtainMessage(Response_loadImage_forManAct, image_list).sendToTarget();
                         break;
-                    case Request_loadSpecificedBitmap:
+                    case Request_loadImage_forDetAct:
                         if(uiHandlers.get(1)==null||msg.obj==null) break;
                         Bitmap b = loadImgBitmap(((String[])msg.obj)[0],((String[])msg.obj)[1]);
                         if(b==null) break;
-                        uiHandlers.get(1).obtainMessage(Response_loadSpecificedBitmap,b).sendToTarget();
+                        uiHandlers.get(1).obtainMessage(Response_loadImage_forDetAct,b).sendToTarget();
                         break;
                     case Request_cleanCache:
                         cleanDiskCache();
@@ -225,6 +232,7 @@ public class ImageLoaderHandler {
                         try {
                             jsonObj = new JSONObject(result);
                             jsonArr = jsonObj.getJSONArray(JSON_key_data);
+                            MyLog.d("GetHttp Data="+result);
                             for (int i = 0; i < jsonArr.length(); i++) {
                                 jsonObj = jsonArr.getJSONObject(i);
                                 // Check if it's gallery image

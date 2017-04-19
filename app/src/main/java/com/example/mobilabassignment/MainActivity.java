@@ -30,11 +30,12 @@ import static com.example.mobilabassignment.AppConstant.Prefs_Flag_Section;
 import static com.example.mobilabassignment.AppConstant.Prefs_Flag_Sort;
 import static com.example.mobilabassignment.AppConstant.Prefs_Flag_View;
 import static com.example.mobilabassignment.AppConstant.Prefs_Flag_Window;
+import static com.example.mobilabassignment.AppConstant.Request_checkWholeList_bitmapExisted;
 import static com.example.mobilabassignment.AppConstant.Request_cleanCache;
 import static com.example.mobilabassignment.AppConstant.Request_getGalleryInfo;
-import static com.example.mobilabassignment.AppConstant.Request_loadImage;
+import static com.example.mobilabassignment.AppConstant.Request_loadImage_forManAct;
 import static com.example.mobilabassignment.AppConstant.Response_getGalleryInfo;
-import static com.example.mobilabassignment.AppConstant.Response_loadImage;
+import static com.example.mobilabassignment.AppConstant.Response_loadImage_forManAct;
 
 public class MainActivity extends AppCompatActivity {
     private String LOG_TAG = this.getClass().getName();
@@ -101,6 +102,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean isEnabled(int position) {
                 if(position==3) {
+                    // sort rising couldn't be choose while section is not user.
                     if (Section.valueOf(setting_section).ordinal() >= 2) return true;
                     else return false;
                 }
@@ -132,13 +134,6 @@ public class MainActivity extends AppCompatActivity {
             windowSP.setClickable(false);
             windowSP.setEnabled(false);
         }
-        /*if(Section.valueOf(setting_section).ordinal()>=2)
-            sortSP.setAdapter(new ArrayAdapter<String>(MainActivity.this,
-                    android.R.layout.simple_spinner_item, optionSort));
-        else
-            sortSP.setAdapter(new ArrayAdapter<String>(MainActivity.this,
-                    android.R.layout.simple_spinner_item,
-                    optionSortWithoutRising));*/
         sectionSP.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long id) {
                 setting_section = optionSection[adapterView.getSelectedItemPosition()];
@@ -173,7 +168,8 @@ public class MainActivity extends AppCompatActivity {
         MyLog.d("filterUpdate()");
         if(pDialog!=null && !pDialog.isShowing()) pDialog.show();
         String[] obj = {setting_section,setting_window,setting_sort};
-        imgLoaderHandler.getHandler().removeMessages(Request_loadImage);
+        // Use new setting as result, so remove perior pending event.
+        imgLoaderHandler.getHandler().removeMessages(Request_loadImage_forManAct);
         imgLoaderHandler.getHandler().removeMessages(Request_getGalleryInfo);
         Message msg = Message.obtain(imgLoaderHandler.getHandler(), Request_getGalleryInfo,obj);
         msg.sendToTarget();
@@ -298,7 +294,7 @@ public class MainActivity extends AppCompatActivity {
                 case Response_getGalleryInfo:
                     updateView();
                     break;
-                case Response_loadImage:
+                case Response_loadImage_forManAct:
                     imgAdapter.notifyDataSetChanged();
                     break;
                 default: super.handleMessage(msg);

@@ -10,10 +10,11 @@ import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import static com.example.mobilabassignment.AppConstant.Request_checkWholeList_bitmapExisted;
 import static com.example.mobilabassignment.AppConstant.Request_getGalleryInfo;
-import static com.example.mobilabassignment.AppConstant.Request_loadImage;
-import static com.example.mobilabassignment.AppConstant.Request_loadSpecificedBitmap;
-import static com.example.mobilabassignment.AppConstant.Response_loadSpecificedBitmap;
+import static com.example.mobilabassignment.AppConstant.Request_loadImage_forDetAct;
+import static com.example.mobilabassignment.AppConstant.Request_loadImage_forManAct;
+import static com.example.mobilabassignment.AppConstant.Response_loadImage_forDetAct;
 
 public class DetailedImageActivity extends AppCompatActivity {
 
@@ -25,13 +26,15 @@ public class DetailedImageActivity extends AppCompatActivity {
         Resources rcs = getResources();
         if(intent.getAction().equals(AppConstant.Intent_action_displayDetail)){
             ImageLoaderHandler loadHandler = ImageLoaderHandler.getInstance();
-            loadHandler.getHandler().removeMessages(Request_loadImage);
-            loadHandler.getHandler().removeMessages(Request_getGalleryInfo);
             UIHandler uihandler = new UIHandler();
             loadHandler.addUIHander(uihandler);
             GalleryImage item = intent.getParcelableExtra(AppConstant.flag_galleryImage);
             String[] obj = {item.getLink(),item.getCacheKey()};
-            loadHandler.getHandler().obtainMessage(Request_loadSpecificedBitmap,obj).sendToTarget();
+            // Make loading bitmap run on first priority, after that, check if other image wasn't loaded on MainActivity.
+            loadHandler.getHandler().removeMessages(Request_loadImage_forManAct);
+            loadHandler.getHandler().removeMessages(Request_getGalleryInfo);
+            loadHandler.getHandler().obtainMessage(Request_loadImage_forDetAct,obj).sendToTarget();
+            loadHandler.getHandler().obtainMessage(Request_checkWholeList_bitmapExisted).sendToTarget();
             TextView title = (TextView) findViewById(R.id.detail_title_id);
             TextView description = (TextView) findViewById(R.id.detail_description_id);
             TextView score = (TextView) findViewById(R.id.detail_score_id);
@@ -55,7 +58,7 @@ public class DetailedImageActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             MyLog.i("msg.what="+msg.what);
             switch (msg.what){
-                case Response_loadSpecificedBitmap:
+                case Response_loadImage_forDetAct:
                     if(msg.obj==null) break;
                     ImageView image = (ImageView) findViewById(R.id.detail_image_id);
                     image.setImageBitmap((Bitmap) msg.obj);
