@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">MobiLabAssignment</string>
+    <string name="mainActivity_name">Imgur</string>
+
+    <string name="setting">Setting</string>
+    <string name="setting_displayed_view">Display view</string>
+    <string name="view_option_gridView">Grid View</string>
+    <string name="view_option_listView">List View</string>
+    <string name="view_option_staggeredGridView">Staggered Grid View</string>
+    <string name="setting_specify_section">Specify section</string>
+    <string name="section_option_hot">Hot [default]</string>
+    <string name="section_option_top">Top</string>
+    <string name="section_option_userWithViral">User include Viral</string>
+    <string name="section_option_userWithoutViral">User exclude Viral</string>
+    <string name="setting_specify_window">Specify windows</string>
+    <string name="window_option_day">Day [default]</string>
+    <string name="window_option_week">Week</string>
+    <string name="window_option_month">Month</string>
+    <string name="window_option_year">Year</string>
+    <string name="setting_specify_sort">Specify sort</string>
+    <string name="sort_option_viral">Viral [default]</string>
+    <string name="sort_option_top">Top</string>
+    <string name="sort_option_time">Time</string>
+    <string name="sort_option_rising">Rising</string>
+    <string name="setting_hideOrShow_actionbar">Hide Actionbar while scrolling</string>
+    <string name="setting_clear_cache">Clean cache</string>
+    <string name="about_title">About</string>
+    <string name="about_field_version">App version: </string>
+    <string name="about_field_developed_time">Development time: </string>
+    <string name="about_field_author">Author: </string>
+    <string name="notify_network_unavailable">Please turn on network</string>
+    <string name="spinner_prompt_section">Pick a Section:</string>
+    <string name="spinner_prompt_window">Pick a Window:</string>
+    <string name="spinner_prompt_sort">Pick a Sort:</string>
+    <string name="field_title">Title: </string>
+    <string name="field_description">Description: </string>
+    <string name="field_score">Score: </string>
+    <string name="field_upvotes">Upvotes: </string>
+    <string name="field_downvotes">Downvotes: </string>
+    <string name="notification_cache_cleaned">Cache is cleaned.</string>
+</resources>
