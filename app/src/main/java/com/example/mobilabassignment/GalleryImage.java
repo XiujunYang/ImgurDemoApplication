@@ -11,7 +11,7 @@ import android.os.Parcelable;
 public class GalleryImage implements Parcelable{
     private String id, title, description, link, cacheKey;
     private int score, upvotes, downvotes;
-    private Bitmap imgBitmap;
+    private Bitmap imgBitmap=null;
 
     public GalleryImage(String id, String title, String descript, String link, String cacheKey,
                         int score, int ups, int downs){

@@ -15,7 +15,6 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -30,7 +29,6 @@ import static com.example.mobilabassignment.AppConstant.Prefs_Flag_Section;
 import static com.example.mobilabassignment.AppConstant.Prefs_Flag_Sort;
 import static com.example.mobilabassignment.AppConstant.Prefs_Flag_View;
 import static com.example.mobilabassignment.AppConstant.Prefs_Flag_Window;
-import static com.example.mobilabassignment.AppConstant.Request_checkWholeList_bitmapExisted;
 import static com.example.mobilabassignment.AppConstant.Request_cleanCache;
 import static com.example.mobilabassignment.AppConstant.Request_getGalleryInfo;
 import static com.example.mobilabassignment.AppConstant.Request_loadImage_forManAct;
@@ -51,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
     ProgressDialog pDialog;
     Spinner sectionSP,windowSP,sortSP;
     boolean userIsInteracting = false;
-    ImageLoaderHandler imgLoaderHandler;
+    ImageLoadingManager imgLoaderHandler;
     UIHandler uiHandler;
 
     /*Setting, and default value*/
@@ -59,13 +57,13 @@ public class MainActivity extends AppCompatActivity {
             Section.user_exclude_viral.name()};
     final String[] optionWindow = {Window.day.name(),Window.week.name(),Window.month.name(),
             Window.year.name()};
-    final String[] optionSortWithoutRising = {Sort.viral.name(),Sort.top.name(),Sort.time.name()};
     final String[] optionSort = {Sort.viral.name(),Sort.top.name(),Sort.time.name(),Sort.rising.name()};
     int setting_view;//0: gridView; 1:listView; 2:staggeredGridView
     String setting_section, setting_window, setting_sort;
     Section default_section= Section.hot;
     Window default_window= Window.day;
     Sort default_sort = Sort.viral;
+    LooperThread mylooper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +74,10 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         toolbar.setTitle("");
         setSupportActionBar(toolbar);
+        if(null==mylooper){
+            mylooper = new LooperThread();
+            mylooper.start();
+        }
         recyclerView = (RecyclerView) findViewById(R.id.recyclerView_id);
         sectionSP = (Spinner) findViewById(R.id.spinner_section);
         windowSP = (Spinner) findViewById(R.id.spinner_window);
@@ -85,9 +87,8 @@ public class MainActivity extends AppCompatActivity {
         setting_section = sharedPreferences.getString(Prefs_Flag_Section, default_section.name());
         setting_window = sharedPreferences.getString(Prefs_Flag_Window, default_window.name());
         setting_sort = sharedPreferences.getString(Prefs_Flag_Sort, default_sort.name());
-        new LooperThread().start();
-        uiHandler = new UIHandler();
-        if(imgLoaderHandler==null) imgLoaderHandler = ImageLoaderHandler.getInstance(mContext);
+        if(uiHandler==null) uiHandler = new UIHandler();
+        if(imgLoaderHandler==null) imgLoaderHandler = ImageLoadingManager.getInstance(mContext);
         imgLoaderHandler.addUIHander(uiHandler);
         if(savedInstanceState==null) filterUpdate();
         else list = savedInstanceState.getParcelableArrayList(GallyImage_List);
@@ -98,9 +99,10 @@ public class MainActivity extends AppCompatActivity {
         windowSP.setAdapter(new ArrayAdapter<String>(MainActivity.this,
                 R.layout.simple_spinner_item, optionWindow));
         ArrayAdapter<String> sortArrayAdapter = new ArrayAdapter<String>(this,
-                R.layout.simple_spinner_item, optionSort) { //Todo: dispear rising
+                R.layout.simple_spinner_item, optionSort) {
             @Override
             public boolean isEnabled(int position) {
+                //Todo: It should look like unclickable.
                 if(position==3) {
                     // sort rising couldn't be choose while section is not user.
                     if (Section.valueOf(setting_section).ordinal() >= 2) return true;
@@ -114,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
         windowSP.setSelection(Window.valueOf(setting_window).ordinal());
         sortSP.setSelection(Sort.valueOf(setting_sort).ordinal());
         pDialog = new ProgressDialog(MainActivity.this);
-        pDialog.setMessage("Imgur Loading...");
+        pDialog.setMessage("Loading...");
         pDialog.setCanceledOnTouchOutside(false);
     }
 
@@ -195,8 +197,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy(){
         super.onDestroy();
-        //imgLoaderHandler.removeUIHandler(0);
-        imgLoaderHandler.quit();
+        if(uiHandler!=null) imgLoaderHandler.removeUIHandler(uiHandler);
+        //imgLoaderHandler.quit();
     }
 
     @Override
@@ -245,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
             case R.id.about:
                 AlertDialog.Builder aboutDialog = new AlertDialog.Builder(MainActivity.this,R.style.AboutDialogTheme);
                 aboutDialog.setTitle(getResources().getString(R.string.about_title));
-                aboutDialog.setMessage(+AppConstant.app_version+"\n"
+                aboutDialog.setMessage(getResources().getString(R.string.about_field_version)+AppConstant.app_version+"\n"
                         +getResources().getString(R.string.about_field_developed_time)+AppConstant.development_time+"\n"
                         +getResources().getString(R.string.about_field_author)+AppConstant.author_info);
                 aboutDialog.show();

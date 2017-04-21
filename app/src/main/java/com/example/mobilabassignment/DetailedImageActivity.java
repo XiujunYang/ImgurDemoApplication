@@ -1,5 +1,6 @@
 package com.example.mobilabassignment;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -11,12 +12,16 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import static com.example.mobilabassignment.AppConstant.Request_checkWholeList_bitmapExisted;
-import static com.example.mobilabassignment.AppConstant.Request_getGalleryInfo;
 import static com.example.mobilabassignment.AppConstant.Request_loadImage_forDetAct;
 import static com.example.mobilabassignment.AppConstant.Request_loadImage_forManAct;
 import static com.example.mobilabassignment.AppConstant.Response_loadImage_forDetAct;
+import static com.example.mobilabassignment.AppConstant.flag_galleryImage;
 
 public class DetailedImageActivity extends AppCompatActivity {
+    UIHandler uihandler;
+    ImageView image;
+    Bitmap imgBitmap;
+    ProgressDialog pDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,17 +29,30 @@ public class DetailedImageActivity extends AppCompatActivity {
         setContentView(R.layout.activity_detailed_image);
         Intent intent = getIntent();
         Resources rcs = getResources();
+        uihandler = new UIHandler();
+        ImageLoadingManager.getInstance().addUIHander(uihandler);
+        pDialog = new ProgressDialog(DetailedImageActivity.this);
+        pDialog.setMessage("Loading...");
+        pDialog.setCanceledOnTouchOutside(false);
+        image = (ImageView) findViewById(R.id.detail_image_id);
         if(intent.getAction().equals(AppConstant.Intent_action_displayDetail)){
-            ImageLoaderHandler loadHandler = ImageLoaderHandler.getInstance();
-            UIHandler uihandler = new UIHandler();
-            loadHandler.addUIHander(uihandler);
-            GalleryImage item = intent.getParcelableExtra(AppConstant.flag_galleryImage);
+            GalleryImage item = intent.getParcelableExtra(flag_galleryImage);
             String[] obj = {item.getLink(),item.getCacheKey()};
+            if(savedInstanceState!=null) {
+                imgBitmap = savedInstanceState.getParcelable(flag_galleryImage);
+                image.setImageBitmap(imgBitmap);
+            } else {
+                imgBitmap = ImageLoadingManager.getInstance().loadImgBitmapFromCache(item.getLink(),item.getCacheKey());
+                if(imgBitmap!=null) image.setImageBitmap(imgBitmap);
+                else {
+                    if (pDialog != null && !pDialog.isShowing()) pDialog.show();
+                    MyLog.i("ProgressDialog begin to show.");
             // Make loading bitmap run on first priority, after that, check if other image wasn't loaded on MainActivity.
-            loadHandler.getHandler().removeMessages(Request_loadImage_forManAct);
-            loadHandler.getHandler().removeMessages(Request_getGalleryInfo);
-            loadHandler.getHandler().obtainMessage(Request_loadImage_forDetAct,obj).sendToTarget();
-            loadHandler.getHandler().obtainMessage(Request_checkWholeList_bitmapExisted).sendToTarget();
+                    ImageLoadingManager.getInstance().getHandler().removeMessages(Request_loadImage_forManAct);
+                    ImageLoadingManager.getInstance().getHandler().obtainMessage(
+                            Request_loadImage_forDetAct, obj).sendToTarget();
+                }
+            }
             TextView title = (TextView) findViewById(R.id.detail_title_id);
             TextView description = (TextView) findViewById(R.id.detail_description_id);
             TextView score = (TextView) findViewById(R.id.detail_score_id);
@@ -53,6 +71,18 @@ public class DetailedImageActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable(flag_galleryImage,imgBitmap);
+    }
+
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+        ImageLoadingManager.getInstance().removeUIHandler(uihandler);
+    }
+
     class UIHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
@@ -60,8 +90,11 @@ public class DetailedImageActivity extends AppCompatActivity {
             switch (msg.what){
                 case Response_loadImage_forDetAct:
                     if(msg.obj==null) break;
-                    ImageView image = (ImageView) findViewById(R.id.detail_image_id);
-                    image.setImageBitmap((Bitmap) msg.obj);
+                    if(pDialog.isShowing()) pDialog.dismiss();
+                    imgBitmap = (Bitmap) msg.obj;
+                    image.setImageBitmap(imgBitmap);
+                    ImageLoadingManager.getInstance().getHandler().
+                            obtainMessage(Request_checkWholeList_bitmapExisted).sendToTarget();
                     break;
                 default: super.handleMessage(msg);
             }

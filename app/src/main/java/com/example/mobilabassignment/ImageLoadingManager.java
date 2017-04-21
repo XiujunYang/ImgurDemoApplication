@@ -14,7 +14,6 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
-import android.util.Log;
 import android.widget.Toast;
 
 import com.jakewharton.disklrucache.DiskLruCache;
@@ -36,6 +35,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import cz.msebera.android.httpclient.HttpResponse;
 import cz.msebera.android.httpclient.client.HttpClient;
@@ -73,9 +76,17 @@ import static com.example.mobilabassignment.AppConstant.url_page;
  * Created by Jean on 2017/4/19.
  */
 
-public class ImageLoaderHandler {
+public class ImageLoadingManager {
+    //Gets the number of available cores (not always the same as the maximum number of cores)
+    private static int NUMBER_OF_CORES = Runtime.getRuntime().availableProcessors();
+    private static final int KEEP_ALIVE_TIME = 1;
+    private static final TimeUnit KEEP_ALIVE_TIME_UNIT = TimeUnit.SECONDS;
+    // A queue of Runnables
+    ThreadPoolExecutor mThreadPool;
+    BlockingQueue<Runnable> mWorkQueue;
+
     private Context mContext;
-    private static ImageLoaderHandler instance;
+    private static ImageLoadingManager instance;
     private HandlerThread handlerThread;
     private Handler bgdHander;
     HashMap<Integer,Handler> uiHandlers = new HashMap<Integer,Handler>();//UI thread
@@ -85,26 +96,28 @@ public class ImageLoaderHandler {
     NetworkChangedReceiver networkChangedReceiver = new NetworkChangedReceiver();
     IntentFilter networkFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
 
-    public static ImageLoaderHandler getInstance(Context context){
-        if(instance==null) instance = new ImageLoaderHandler(context);
+    public static ImageLoadingManager getInstance(Context context){
+        if(instance==null) instance = new ImageLoadingManager(context);
         return instance;
     }
 
-    public static ImageLoaderHandler getInstance() {return instance;}
+    public static ImageLoadingManager getInstance() {return instance;}
 
-    public ImageLoaderHandler(Context context){
+    public ImageLoadingManager(Context context){
         mContext = context;
         initalBgdThread();
         bgdHander.obtainMessage(Request_InitDiskCacheDir).sendToTarget();
     }
 
     public void addUIHander(Handler handler){
+        //0 is used for MainActivity.UIHandler; i is for used for DetailedImageActivity.
         if(handler instanceof MainActivity.UIHandler) uiHandlers.put(0,handler);
         else if(handler instanceof DetailedImageActivity.UIHandler) uiHandlers.put(1,handler);
     }
 
-    public void removeUIHandler(int index){
-        uiHandlers.remove(index);
+    public void removeUIHandler(Handler handler){
+        if(handler instanceof MainActivity.UIHandler) uiHandlers.remove(0);
+        else if(handler instanceof DetailedImageActivity.UIHandler) uiHandlers.remove(1);
     }
 
     public Handler getHandler(){return bgdHander;}
@@ -114,7 +127,6 @@ public class ImageLoaderHandler {
         if(handlerThread!=null) handlerThread.quit();
     }
 
-    //Todo: Here should multiple Thread in parallel.
     private void initalBgdThread(){
         handlerThread = new HandlerThread("ImageLoader");
         handlerThread.start();
@@ -130,43 +142,70 @@ public class ImageLoaderHandler {
                         int page=0;
                         Object obj= msg.obj;
                         if(obj==null||uiHandlers.get(0)==null) break;
-                        if(msg.arg1==0){//page
+                        if(msg.arg1==0){//msg.arg1 is page, default is 0.
                             image_list.clear();
                             filter_section = ((String[])obj)[0];
                             filter_window = ((String[])obj)[1];
                             filter_sort = ((String[])obj)[2];
-                            String[] params = {filter_section, filter_window, filter_sort};
-                            obtainMessage(Request_getGalleryInfo, 1, -1, params).sendToTarget();
-                        } else if(msg.arg1>0 && msg.arg1<1){
+                            if(mWorkQueue!=null) mWorkQueue.clear();
+                            if(mThreadPool!=null) mThreadPool.shutdownNow();
+                        } else if(msg.arg1>0 && msg.arg1<1)
                             page =msg.arg1;
-                            String[] params = {filter_section,filter_window,filter_sort};
-                            obtainMessage(Request_getGalleryInfo, page+1, -1, params).sendToTarget();
-                        } else page = msg.arg1;
+                        else page = msg.arg1;
 
                         // Todo: It could use endless list by listen screen end to bottom.
                         if(getGallyInfo(filter_section,filter_window,filter_sort,page)) {
                             if(image_list.size()<=0) break;
-                            uiHandlers.get(0).obtainMessage(Response_getGalleryInfo, image_list).sendToTarget();
-                            obtainMessage(Request_checkWholeList_bitmapExisted).sendToTarget();
-                        } else uiHandlers.get(0).obtainMessage(Response_getGalleryInfo).sendToTarget();
-                        break;
-                    case Request_checkWholeList_bitmapExisted:
-                        for(Iterator it = image_list.iterator();it.hasNext();){
-                            GalleryImage item = (GalleryImage) it.next();
-                            if(item.getImgBitmap()==null)
-                                obtainMessage(Request_loadImage_forManAct,item).sendToTarget();
+                            if(uiHandlers.get(0)!=null)
+                                uiHandlers.get(0).obtainMessage(Response_getGalleryInfo, image_list).sendToTarget();
+                            obtainMessage(Request_loadImage_forManAct).sendToTarget();
+                        } else
+                            if(uiHandlers.get(0)!=null)
+                                uiHandlers.get(0).obtainMessage(Response_getGalleryInfo).sendToTarget();
+
+                        if(msg.arg1<1){
+                            String[] params = {filter_section,filter_window,filter_sort};
+                            obtainMessage(Request_getGalleryInfo, page+1, -1, params).sendToTarget();
                         }
                         break;
+                    case Request_checkWholeList_bitmapExisted:
+                        obtainMessage(Request_loadImage_forManAct).sendToTarget();
+                        break;
                     case Request_loadImage_forManAct:
-                        if(msg.obj==null||uiHandlers.get(0)==null) break;
-                        if(loadImgBitmap((GalleryImage) msg.obj))
-                            uiHandlers.get(0).obtainMessage(Response_loadImage_forManAct, image_list).sendToTarget();
+                        //Only loading image use muti-thread and run in parallel. Its advantage is efficient in image loading,
+                        // and also avoid race condition with Request_getGalleryInfo.
+                        mWorkQueue = new LinkedBlockingQueue<Runnable>();
+                        mThreadPool = new ThreadPoolExecutor(
+                                NUMBER_OF_CORES,       // Initial pool size
+                                NUMBER_OF_CORES,       // Max pool size
+                                KEEP_ALIVE_TIME,
+                                KEEP_ALIVE_TIME_UNIT,
+                                mWorkQueue);
+                        /*Prevent task is pending in queue. Here make will let threadPool create core thread first.
+                                            The first task received while threadPool is initialing threads and no thread could operate task.
+                                            This first task will be operated util threadPool is ready and there's second task received*/
+                        //mThreadPool.prestartAllCoreThreads();
+                        for (Iterator it = image_list.iterator(); it.hasNext();) {
+                            GalleryImage item = (GalleryImage) it.next();
+                            if (item.getImgBitmap()==null) {
+                                mThreadPool.execute(new LoadBitmapTask(item));
+                                MyLog.i("mThreadPool.task="+ mThreadPool.getTaskCount());
+                            }
+                        }
+                        try{
+                            mThreadPool.awaitTermination(10, TimeUnit.SECONDS);
+                            mThreadPool.shutdown();
+                        }catch (InterruptedException ie){
+                            MyLog.e("InterruptedException: "+ ie.getMessage());
+                        }
                         break;
                     case Request_loadImage_forDetAct:
-                        if(uiHandlers.get(1)==null||msg.obj==null) break;
+                        if(mWorkQueue!=null) mWorkQueue.clear();
+                        if(mThreadPool!=null) mThreadPool.shutdownNow();
+                        if(msg.obj==null||uiHandlers.get(1)==null) break;
                         Bitmap b = loadImgBitmap(((String[])msg.obj)[0],((String[])msg.obj)[1]);
                         if(b==null) break;
-                        uiHandlers.get(1).obtainMessage(Response_loadImage_forDetAct,b).sendToTarget();
+                        if(uiHandlers.get(1)!=null)uiHandlers.get(1).obtainMessage(Response_loadImage_forDetAct,b).sendToTarget();
                         break;
                     case Request_cleanCache:
                         cleanDiskCache();
@@ -177,6 +216,20 @@ public class ImageLoaderHandler {
                 }
             }
         };
+    }
+
+    //Callable thread
+    class LoadBitmapTask implements Runnable {
+        GalleryImage item;
+        public LoadBitmapTask(GalleryImage item){
+            this.item = item;
+        }
+        @Override
+        public void run() {
+            loadImgBitmap(item);
+            if(uiHandlers.get(0)!=null)
+                uiHandlers.get(0).obtainMessage(Response_loadImage_forManAct, image_list).sendToTarget();
+        }
     }
 
     private void initalDiskCacheDir(){
@@ -286,6 +339,7 @@ public class ImageLoaderHandler {
         bufferedReader.close();
         return result;
     }
+
     private String convertHashKeyForCache(String urlLink) { //use link as key
         String cacheKey;
         try {
@@ -304,6 +358,14 @@ public class ImageLoaderHandler {
             cacheKey = String.valueOf(urlLink.hashCode());
         }
         return cacheKey;
+    }
+
+    // Allow DetailedImageActivity to load image from cache in UI Thread.
+    public Bitmap loadImgBitmapFromCache(String link, String key){
+        if(new File(getDiskCacheDir(),key+".0").exists()){//Todo: there include extension name .0
+            return readImgFromCache(key);
+        }
+        return null;
     }
 
     private boolean loadImgBitmap(GalleryImage item){
@@ -373,7 +435,7 @@ public class ImageLoaderHandler {
             DiskLruCache.Editor editor = mDiskLruCache.edit(key);
             if (editor != null) {
                 OutputStream outputStream = editor.newOutputStream(0);
-                if (bitmap.compress(Bitmap.CompressFormat.JPEG,100, outputStream)) {
+                if (bitmap.compress(Bitmap.CompressFormat.JPEG,50, outputStream)) {
                     editor.commit();
                 } else {
                     editor.abort();
@@ -415,8 +477,6 @@ public class ImageLoaderHandler {
     }
 
     public class NetworkChangedReceiver extends BroadcastReceiver {
-        private String LOG_TAG = "NetworkChangedReceiver";
-
         @Override
         public void onReceive(Context context, Intent intent) {
             MyLog.i("onReceive: "+intent.getAction());
