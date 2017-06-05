@@ -103,7 +103,7 @@ public class ImageLoadingManager {
 
     public static ImageLoadingManager getInstance() {return instance;}
 
-    public ImageLoadingManager(Context context){
+    private ImageLoadingManager(Context context){
         mContext = context;
         initalBgdThread();
         bgdHander.obtainMessage(Request_InitDiskCacheDir).sendToTarget();
@@ -467,8 +467,7 @@ public class ImageLoadingManager {
                 if (mContext != null) mContext.unregisterReceiver(networkChangedReceiver);
             }catch (IllegalArgumentException e){}
             return true;
-        }
-        else {
+        } else {
             if(mContext!=null) mContext.registerReceiver(networkChangedReceiver,networkFilter);
             Toast.makeText(mContext, mContext.getResources().getText(R.string.notify_network_unavailable)
                     , Toast.LENGTH_SHORT).show();
