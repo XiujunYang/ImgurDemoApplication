@@ -1,11 +1,9 @@
-Implement a simple app that allows to browse Imgur gallery using http://api.imgur.com/
-1. Show Gallery images in a grid view
-2. Show image description over the image, bottom-aligned or top-aligned
-3. Cache images in memory / on disk
-4. Allow to select the gallery section section: hot, top, user, include / exclude viral images from the result set
-5. Implement "About" screen containing the app info (version, development time) and author name (email)
-6. Allow to switch between list / grid / staggered grid view
-7. Allow to specify window and sort parameters
-8. Hide/show the action bar when scrolling the list
-9. Handle screen orientation changed
-10.When clicking an image in the gallery - show its details: big image, title, description, upvotes, downvotes and score.
+This is a simple Android application, and developed by myself only. This application use restful api imgur provided(http://api.imgur.com/) and display Gallery images. Besides, it supported following function:
+1. Display image description under the image (bottom-aligned)
+2. Cache images on disk(by 3rd party libs)
+3. User could select the gallery section, window and sort parameters to re-query image sets on UI.
+4. There¡¦s a about application¡¦s info, like app version, development time and author
+5. Allow user to switch between list / grid / staggered grid view
+6. Hide/show the action bar when scrolling the list
+7. Screen orientation could be changed
+8. When clicking an image in the gallery, it will show its details, include a bigger 
